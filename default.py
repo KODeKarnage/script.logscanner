@@ -25,7 +25,6 @@ import xbmcgui
 import os
 import time
 import datetime
-import random
 
 import smtplib
 from email.mime.text import MIMEText
@@ -43,45 +42,42 @@ DIALOG          = xbmcgui.Dialog()
 LOG_FILE 	 	= os.path.join(xbmc.translatePath('special://temp'), 'kodi.log')
 ERROR_FLAGS		= ['ERROR: EXCEPTION Thrown']
 
+# STORED = 'MYFITSRERROPR|||SECONDERROPR'
 
-class Error(object):
+# def __setting__(key):
 
-	def __init__(self):
+# 	return STORED
 
-		self.line_cache = []
 
-	def add_line(self, new_line):
+# def __setset__(key, setting):
 
-		self.line_cache.append(new_line)
+# 	STORED = setting 
 
-	def __len__(self):
-
-		return len(self.line_cache)
+# LOG_FILE 	= 'C:\\temp\\kodi.log'
 
 
 class Error_Blotter(object):
 
-	def __init__(self, max_lines = 15):
-
-		self.working_list = []
+	def __init__(self, max_lines = 30):
+		self.active_error = []
 		self.final_list   = []
 		self.max_lines    = max_lines
 
-	def add_error(self, error):
-
-		self.working_list.append(error)
+	def new_error(self, line):
+		if self.active_error:
+			self.final_list.append(self.active_error)
+		self.active_error = [line]
 
 	def add_line(self, line):
-
-		for err in self.working_list:
-
-		 	err.add_line(line)
-
-		self.final_list.extend([x for x in self.working_list if len(x) >= self.max_lines])
+		if self.active_error:
+			self.active_error.append(line)
+			if len(self.active_error) >= self.max_lines:
+				self.final_list.append(self.active_error)
+				self.active_error = []
 
 	def finalise(self):
-
-		self.final_list.extend(self.working_list)
+		if self.active_error:
+			self.final_list.append(self.active_error)
 
 
 class Main(object):
@@ -98,14 +94,24 @@ class Main(object):
 
 		self.commence_scan_and_reporting()
 
+		print 'Exiting'
+
 
 	def commence_scan_and_reporting(self):
 
+		print 'Scanning logs'
+
 		found_errors = self.scan_logs()
+
+		print 'Error Cache Size = %s' % len(self.error_cache)
 
 		self.error_cache.update(found_errors)
 
+		print 'Error Cache Size = %s' % len(self.error_cache)
+
 		new_errors = self.compile_errors(self.error_cache)
+
+		print 'New Errors = %s' % len(new_errors)
 
 		if new_errors:
 
@@ -127,9 +133,11 @@ class Main(object):
 
 				if any([error in line for error in ERROR_FLAGS]):
 
-					blotter.add_error(Error())
+					blotter.new_error(line)
 
-				blotter.add_line(line)
+				else:
+
+					blotter.add_line(line)
 
 			blotter.finalise()
 
@@ -179,6 +187,8 @@ class Main(object):
 
 		''' errors is a list of tuples, key, rest of error '''
 
+		print 'Emailing...'
+
 		thyme = time.time()
 
 		recipient = 'subliminal.karnage@gmail.com'
@@ -187,7 +197,7 @@ class Main(object):
 		for _, error in errors:
 			body += '<tr><td>%s</td></tr>' % "\n------------------------------------------------------------------------------\n"
 
-			for line in error.line_cache:
+			for line in error:
 				body += '<tr><td>%s</td></tr>' % line
 
 			body += '<tr><td>%s</td></tr>' % "\n------------------------------------------------------------------------------\n"
@@ -203,8 +213,6 @@ class Main(object):
 		smtp = smtplib.SMTP('alt4.gmail-smtp-in.l.google.com')
 		smtp.sendmail(msg['From'], msg['To'], msg.as_string(9))
 		smtp.quit()
-
-
 
 
 if ( __name__ == "__main__" ):
